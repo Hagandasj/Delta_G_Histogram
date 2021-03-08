@@ -3,7 +3,10 @@
 @author: hagan
 
 Notes:
-    Plotting a standardized histogram for conductance values of current datasets.
+    Plot Kernel Density Estimation (KDE) Figures.
+    
+    This script takes ~30 minutes for a nanopore experiment collected over
+    20 minutes at 100 kHz acquisition rate.
 """
 
 #%%
@@ -20,29 +23,34 @@ path = "D:\\Research\\Data\\Azo_Switch_Data\\February17_2021\\Azo"
 acquisition_rate = 100000
 
 # Times stamp for data to run
-start_time = 1
-end_time = "Whole_Run" # Add text to add all data to last data point
+start_time = 200
+end_time = 260 # "Whole_Run" # Inputting a string will plot the whole dataset
 
 # Standardize Data: Sets STD = 1 and Mean = 0
-standardize_data = True # False == No; True == Yes
+standardize_data = False # False == No; True == Yes
 
 #%%
 
 """ ----- Import Section ----- """
 
+# Modules that are required to run this script
 import matplotlib.pyplot as plt
 import os
 import numpy as np
 import math
 import time
 from sklearn import preprocessing
-from scipy.stats import gaussian_kde
 import seaborn as sns
 
-sns.set_style("darkgrid")
-sns.set(font_scale = 2)
+# Setting styles for seaborn plots
+sns.set_style(style = "darkgrid")
+sns.set(font_scale = 2, font = "Arial")
+
+# Setting timer for script
 run_time = time.time()
-folder_to_add = ["DeltaG_Plots"]
+
+# Setting folder name to be generated
+folder_to_add = ["Conductance_KDE_Plots"]
 
 #%%
 
@@ -60,7 +68,6 @@ class DeltaGHistogram():
         self.appl_voltage = 0
         self.file_path = file_path
         self.make_folder = make_folder
-        self.bins = 0
         self.standardize = standardize
         
         
@@ -78,14 +85,12 @@ class DeltaGHistogram():
             # Extracting data as a double for most accuracy in final values
             raw_data = np.fromfile(working_file, dtype = np.dtype('>d')) # use numpy module to assign current trace data to [raw_data]
             
-            print(f"1: {time.time() - run_time}")
             # Close the opened data
             working_file.close()
 
-        # Calculating applied voltage from bin file data (based on the first 100 datapoints)
-        self.appl_voltage = math.ceil(sum(raw_data[5:105:2]) / len(raw_data[5:105:2]))
+        # Calculating applied voltage from bin file data (based on the first 200 datapoints)
+        self.appl_voltage = math.ceil(sum(raw_data[5:205:2]) / len(raw_data[5:205:2]))
         
-        print(f"2: {time.time() - run_time}")
         if (type(self.end_t) is int) == True or (type(self.end_t) is float) == True:
             end_time = self.end_t # [sec]
         elif (type(self.end_t) is str) == True:
@@ -95,29 +100,55 @@ class DeltaGHistogram():
         actual_end = math.floor(end_time * self.acq_rate) #  # formats end time to acquisition rate
     
         working_baseline, raw_data = raw_data[0::2][actual_start:actual_end:], []
-        print(f"3: {time.time() - run_time}")
+        
         # Converting current to delta G
         delta_g_values, working_baseline = np.divide(working_baseline, self.appl_voltage), []
-        print(f"4: {time.time() - run_time}")
-        # bin_number = int(math.log2(len(delta_g_values)) + 1) + 20
         
+        # Plotting section for standardized data
         if self.standardize == True:
             scaled_data, delta_g_values = preprocessing.scale(delta_g_values), []
-            print(f"5: {time.time() - run_time}")
+            print(f"Starting to Plot Data: {time.time() - run_time}")
             fig, ax = plt.subplots(figsize = (9,8))
-            x_grid = np.linspace(-4.5, 4.5, 1000)
-            kde = gaussian_kde(scaled_data, bw_method = 0.2 / scaled_data.std(ddof = 1))
-            plt.plot(kde.evaluate(x_grid))
+            
+            # SciPy Method
+            # x_grid = np.linspace(-4.5, 4.5, 1000)
+            # kde = gaussian_kde(scaled_data, bw_method = 0.2 / scaled_data.std(ddof = 1))
+            # plt.plot(kde.evaluate(x_grid))
+            
+            # SciKit Learn Method
             # kde = KernelDensity(kernel = "gaussian", bandwidth = 0.2).fit(scaled_data)
-            # sns.kdeplot(scaled_data, fill = True, palette = "crest", alpha = 0.8, linewidth = 0)
+            
+            # Seaborn method
+            sns.kdeplot(scaled_data, fill = True, palette = "crest", alpha = 0.8, linewidth = 0)
             ax.set(xlabel = "Standardized Conductance")
-            print(f"6: {time.time() - run_time}")
         
+        # Plotting section for un-standardized data
         elif self.standardize == False:
-            fig, ax = plt.subplots(figsize = (9,8))
+            print(f"Starting to Plot Data: {time.time() - run_time}")
+            
+            fig, ax = plt.subplots(figsize = (10,9))
             sns.kdeplot(delta_g_values, fill = True, palette = "crest", alpha = 0.8, linewidth = 0)
             ax.set(xlabel = "Standardized Conductance")
         
+        # Saving the file section
+        
+            
+        if (type(self.end_t) is str) == True:
+            elapsed_time = "Whole_Run"
+        elif self.end_t - self.star_t < 1:
+            elapsed_time = "{:.0f}_m" .format((self.end_t - self.star_t) * 1000)
+        else:
+            elapsed_time = "{}" .format(self.end_t - self.star_t)
+            
+        if standardize_data == True:
+            standard = "Standardized"
+            file_Name = "{}_{}s_{}" .format(self.data_file, elapsed_time, standard)
+        else:
+            file_Name = "{}_{}s" .format(self.data_file, elapsed_time)
+        
+        plt.savefig(os.path.join(self.file_path, self.make_folder) + "\\" + file_Name + ".png", dpi = 600)
+        
+        # Show and close the plots
         plt.show()
         plt.close()
 
