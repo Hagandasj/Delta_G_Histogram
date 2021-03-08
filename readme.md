@@ -1,7 +1,7 @@
 # Description
 
-This python script will convert current values from bin files to delta G data and create a histogram of the values.
+This python script will convert current values from bin files to conductance data and create a Kernel Density Estimator plot of these values.
 
 ## Notes on Code
 
-This is not a finished product. It will not produe any results. Hoping to finish this by Friday (3/8/2021).
+This file is outputting KDE plots. However, it takes about 30 minutes to generate these plots for a ~20 minute run at 100 kHz. I am hoping to have this optimized by this by Friday (3/8/2021).

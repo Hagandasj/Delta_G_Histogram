@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Mar  8 10:01:20 2021
-
 @author: hagan
+
+Notes:
+    Plotting a standardized histogram for conductance values of current datasets.
 """
 
-# Plotting the histogram of delta G data
-
+#%%
 
 """ ----- Variables to Change ----- """
 
@@ -19,11 +19,11 @@ path = "D:\\Research\\Data\\Azo_Switch_Data\\February17_2021\\Azo"
 # Data Colelction Frequency
 acquisition_rate = 100000
 
-# Times to run:
+# Times stamp for data to run
 start_time = 1
-end_time = "Whole_Run" # "Whole_Run" # "Whole_Run" #"Plot_the_whole_thing" <<< Uncomment this to run the whole baseline
+end_time = "Whole_Run" # Add text to add all data to last data point
 
-# Standardize Data - Sets STD = 1 and Mean = 0
+# Standardize Data: Sets STD = 1 and Mean = 0
 standardize_data = True # False == No; True == Yes
 
 #%%
@@ -36,11 +36,11 @@ import numpy as np
 import math
 import time
 from sklearn import preprocessing
-import statistics
+from scipy.stats import gaussian_kde
 import seaborn as sns
 
 sns.set_style("darkgrid")
-sns.set(font_scale = 3)
+sns.set(font_scale = 2)
 run_time = time.time()
 folder_to_add = ["DeltaG_Plots"]
 
@@ -78,12 +78,14 @@ class DeltaGHistogram():
             # Extracting data as a double for most accuracy in final values
             raw_data = np.fromfile(working_file, dtype = np.dtype('>d')) # use numpy module to assign current trace data to [raw_data]
             
+            print(f"1: {time.time() - run_time}")
             # Close the opened data
             working_file.close()
 
-        # Calculating applied voltage from bin file data
-        self.appl_voltage = math.ceil(sum(raw_data[1::2]) / len(raw_data[1::2]))
+        # Calculating applied voltage from bin file data (based on the first 100 datapoints)
+        self.appl_voltage = math.ceil(sum(raw_data[5:105:2]) / len(raw_data[5:105:2]))
         
+        print(f"2: {time.time() - run_time}")
         if (type(self.end_t) is int) == True or (type(self.end_t) is float) == True:
             end_time = self.end_t # [sec]
         elif (type(self.end_t) is str) == True:
@@ -93,19 +95,24 @@ class DeltaGHistogram():
         actual_end = math.floor(end_time * self.acq_rate) #  # formats end time to acquisition rate
     
         working_baseline, raw_data = raw_data[0::2][actual_start:actual_end:], []
-        
+        print(f"3: {time.time() - run_time}")
         # Converting current to delta G
         delta_g_values, working_baseline = np.divide(working_baseline, self.appl_voltage), []
-        
+        print(f"4: {time.time() - run_time}")
         # bin_number = int(math.log2(len(delta_g_values)) + 1) + 20
         
         if self.standardize == True:
             scaled_data, delta_g_values = preprocessing.scale(delta_g_values), []
-            
+            print(f"5: {time.time() - run_time}")
             fig, ax = plt.subplots(figsize = (9,8))
-            sns.kdeplot(scaled_data, fill = True, palette = "crest", alpha = 0.8, linewidth = 0)
+            x_grid = np.linspace(-4.5, 4.5, 1000)
+            kde = gaussian_kde(scaled_data, bw_method = 0.2 / scaled_data.std(ddof = 1))
+            plt.plot(kde.evaluate(x_grid))
+            # kde = KernelDensity(kernel = "gaussian", bandwidth = 0.2).fit(scaled_data)
+            # sns.kdeplot(scaled_data, fill = True, palette = "crest", alpha = 0.8, linewidth = 0)
             ax.set(xlabel = "Standardized Conductance")
-            
+            print(f"6: {time.time() - run_time}")
+        
         elif self.standardize == False:
             fig, ax = plt.subplots(figsize = (9,8))
             sns.kdeplot(delta_g_values, fill = True, palette = "crest", alpha = 0.8, linewidth = 0)
@@ -113,16 +120,17 @@ class DeltaGHistogram():
         
         plt.show()
         plt.close()
-    
-        return(scaled_data.mean, statistics.stdev(scaled_data))
 
 
 #%%
 
-initialize_data = DeltaGHistogram(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path, make_folder = folder_to_add[0], standardize = standardize_data)
+""" ----- Calling Class and function to plot data ----- """
 
+initialize_data = DeltaGHistogram(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path, make_folder = folder_to_add[0], standardize = standardize_data)
 current_data = DeltaGHistogram.plotHistogram(initialize_data)
 
 #%%
+
+""" ----- Timing Section ----- """
 
 print("This script took {:.5f} seconds to run" .format(time.time() - run_time))
