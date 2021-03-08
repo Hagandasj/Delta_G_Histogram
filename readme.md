@@ -1,0 +1,1 @@
+# This python script will convert current values from bin files to delta G data and create a histogram of the values.
