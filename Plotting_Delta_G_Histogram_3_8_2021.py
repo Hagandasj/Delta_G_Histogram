@@ -24,10 +24,10 @@ acquisition_rate = 100000
 
 # Times stamp for data to run
 start_time = 200
-end_time = 260 # "Whole_Run" # Inputting a string will plot the whole dataset
+end_time = 400 # "Whole_Run" # Inputting a string will plot the whole dataset
 
 # Standardize Data: Sets STD = 1 and Mean = 0
-standardize_data = False # False == No; True == Yes
+standardize_data = True # False == No; True == Yes
 
 #%%
 
@@ -60,7 +60,7 @@ class DeltaGHistogram():
     """ This class will be used to extract data from bin files and create
     delta G histogram. """
     
-    def __init__(self, data_file, acq_rate, start_t, end_t, file_path, make_folder, standardize):
+    def __init__(self, data_file, acq_rate, file_path, make_folder = "Plots_Folder", standardize = True, start_t = 1, end_t = "Whole_Run"):
         self.data_file = data_file
         self.acq_rate = acq_rate
         self.star_t = start_t
@@ -131,8 +131,6 @@ class DeltaGHistogram():
             ax.set(xlabel = "Standardized Conductance")
         
         # Saving the file section
-        
-            
         if (type(self.end_t) is str) == True:
             elapsed_time = "Whole_Run"
         elif self.end_t - self.star_t < 1:
