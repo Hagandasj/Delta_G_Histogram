@@ -14,20 +14,25 @@ Notes:
 """ ----- Variables to Change ----- """
 
 # Name of files to analyze
-files = "JH_L01_2_15_2021_pH7_1MKCl_Azo_2_UV365nm_1_p200mV_10uL_05_uguL_3kbpDNA_GS_1230"
+files = "JH_L01_11_9_2020_pH7_1MKCl_Azo_1_UV365nm_m200mV_blank_1210"
 
 # Path to the Directory where the data is stored.
-path = "D:\\Research\\Data\\Azo_Switch_Data\\February17_2021\\Azo"
+path = "D:\\Research\\Data\\Azo_Switch_Data\\November11_2020\\Azo\\1"
+# February17_2021\\Azo"
 
 # Data Colelction Frequency
 acquisition_rate = 100000
 
 # Times stamp for data to run
-start_time = 200
-end_time = 400 # "Whole_Run" # Inputting a string will plot the whole dataset
+start_time = 1
+end_time = "Whole_Run" # Inputting a string will plot the whole dataset
 
 # Standardize Data: Sets STD = 1 and Mean = 0
 standardize_data = True # False == No; True == Yes
+
+# Set X-Axis Limits
+set_x_axis = True # False == No; True == Yes
+xlim_values = [-5, 5]
 
 #%%
 
@@ -60,7 +65,7 @@ class DeltaGHistogram():
     """ This class will be used to extract data from bin files and create
     delta G histogram. """
     
-    def __init__(self, data_file, acq_rate, file_path, make_folder = "Plots_Folder", standardize = True, start_t = 1, end_t = "Whole_Run"):
+    def __init__(self, data_file, acq_rate, file_path, make_folder = "Plots_Folder", standardize = True, start_t = 1, end_t = "Whole_Run", set_xlim = False, xlim_val = [-4, 4]):
         self.data_file = data_file
         self.acq_rate = acq_rate
         self.star_t = start_t
@@ -69,6 +74,8 @@ class DeltaGHistogram():
         self.file_path = file_path
         self.make_folder = make_folder
         self.standardize = standardize
+        self.set_xlim = set_xlim
+        self.xlim_val = xlim_val
         
         
     def plotHistogram(self):
@@ -83,7 +90,7 @@ class DeltaGHistogram():
                 print(error)
                 
             # Extracting data as a double for most accuracy in final values
-            raw_data = np.fromfile(working_file, dtype = np.dtype('>d')) # use numpy module to assign current trace data to [raw_data]
+            raw_data = np.fromfile(working_file, dtype = np.dtype('>d')) 
             
             # Close the opened data
             working_file.close()
@@ -91,8 +98,9 @@ class DeltaGHistogram():
         # Calculating applied voltage from bin file data (based on the first 200 datapoints)
         self.appl_voltage = math.ceil(sum(raw_data[5:205:2]) / len(raw_data[5:205:2]))
         
+        # Checks if a number or text file is set for the end time to know how much data to analyze.
         if (type(self.end_t) is int) == True or (type(self.end_t) is float) == True:
-            end_time = self.end_t # [sec]
+            end_time = self.end_t 
         elif (type(self.end_t) is str) == True:
             end_time = math.floor(len(raw_data[0::2]) / self.acq_rate)
             
@@ -104,9 +112,10 @@ class DeltaGHistogram():
         # Converting current to delta G
         delta_g_values, working_baseline = np.divide(working_baseline, self.appl_voltage), []
         
-        # Plotting section for standardized data
+        # Plotting for standardized data
         if self.standardize == True:
-            scaled_data, delta_g_values = preprocessing.scale(delta_g_values), []
+            # Standardizing dataset
+            scaled_data, delta_g_values = preprocessing.scale(delta_g_values, with_std = False), []
             print(f"Starting to Plot Data: {time.time() - run_time}")
             fig, ax = plt.subplots(figsize = (9,8))
             
@@ -121,14 +130,22 @@ class DeltaGHistogram():
             # Seaborn method
             sns.kdeplot(scaled_data, fill = True, palette = "crest", alpha = 0.8, linewidth = 0)
             ax.set(xlabel = "Standardized Conductance")
+            
+            # Setting limmits for x axis
+            if self.set_xlim == True:
+                ax.set_xlim(min(self.xlim_val), max(self.xlim_val))
         
-        # Plotting section for un-standardized data
+        # Plotting for un-standardized data
         elif self.standardize == False:
             print(f"Starting to Plot Data: {time.time() - run_time}")
             
             fig, ax = plt.subplots(figsize = (10,9))
             sns.kdeplot(delta_g_values, fill = True, palette = "crest", alpha = 0.8, linewidth = 0)
             ax.set(xlabel = "Standardized Conductance")
+            
+            # Setting limmits for x axis
+            if self.set_xlim == True:
+                ax.set_xlim(min(self.xlim_val), max(self.xlim_val))
         
         # Saving the file section
         if (type(self.end_t) is str) == True:
@@ -155,7 +172,7 @@ class DeltaGHistogram():
 
 """ ----- Calling Class and function to plot data ----- """
 
-initialize_data = DeltaGHistogram(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path, make_folder = folder_to_add[0], standardize = standardize_data)
+initialize_data = DeltaGHistogram(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path, make_folder = folder_to_add[0], standardize = standardize_data, set_xlim = set_x_axis, xlim_val = xlim_values)
 current_data = DeltaGHistogram.plotHistogram(initialize_data)
 
 #%%
