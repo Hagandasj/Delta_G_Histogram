@@ -14,11 +14,11 @@ Notes:
 """ ----- Variables to Change ----- """
 
 # Name of files to analyze
-files = "JH_L01_11_9_2020_pH7_1MKCl_Azo_1_UV365nm_m200mV_blank_1210"
+files = "JH_L01_2_15_2021_pH7_1MKCl_Azo_2_UV365nm_1_p200mV_10uL_05_uguL_3kbpDNA_GS_1212"
 
 # Path to the Directory where the data is stored.
-path = "D:\\Research\\Data\\Azo_Switch_Data\\November11_2020\\Azo\\1"
-# February17_2021\\Azo"
+path = "D:\\Research\\Data\\Azo_Switch_Data\\February17_2021\\Azo"
+# February17_2021\\Azo
 
 # Data Colelction Frequency
 acquisition_rate = 100000
@@ -27,12 +27,12 @@ acquisition_rate = 100000
 start_time = 1
 end_time = "Whole_Run" # Inputting a string will plot the whole dataset
 
-# Standardize Data: Sets STD = 1 and Mean = 0
+# Standardize Data: Sets Mean = 0
 standardize_data = True # False == No; True == Yes
 
 # Set X-Axis Limits
 set_x_axis = True # False == No; True == Yes
-xlim_values = [-5, 5]
+# xlim_values_KDE = [-5, 5]
 
 #%%
 
@@ -61,25 +61,31 @@ folder_to_add = ["Conductance_KDE_Plots"]
 
 """ ----- Class and Function Section ----- """
 
-class DeltaGHistogram():
+class PlotAnalyzeBaseline():
     """ This class will be used to extract data from bin files and create
     delta G histogram. """
-    
-    def __init__(self, data_file, acq_rate, file_path, make_folder = "Plots_Folder", standardize = True, start_t = 1, end_t = "Whole_Run", set_xlim = False, xlim_val = [-4, 4]):
+    def __init__(self, data_file, acq_rate, file_path, make_folder = "Plots_Folder", standardize = True, start_t = 1, end_t = "Whole_Run", set_xlim = False): # , xlim_val = [-4, 4]):
+        # Variables provided by user
         self.data_file = data_file
         self.acq_rate = acq_rate
         self.star_t = start_t
         self.end_t = end_t
-        self.appl_voltage = 0
         self.file_path = file_path
         self.make_folder = make_folder
         self.standardize = standardize
         self.set_xlim = set_xlim
-        self.xlim_val = xlim_val
+        # self.xlim_val = xlim_val
+        
+        # Variables extracted from data
+        self.appl_voltage = 0
+        self.ext_data = []
+        self.working_baseline = []
         
         
-    def plotHistogram(self):
-        """ Function that extracts data and plots everything """
+    def extractBinData(self):
+        """ This function is called to extract data from a bin file. For the data from the dwyer
+        lab it outputs this as a 2D array with the even numbers being currents and the odd numbers 
+        being voltages. """
         # Opening the data from bin files
         with open(os.path.join(self.file_path, f"{self.data_file}.bin")) as working_file: # assign working path to location of .bin files
 
@@ -90,32 +96,60 @@ class DeltaGHistogram():
                 print(error)
                 
             # Extracting data as a double for most accuracy in final values
-            raw_data = np.fromfile(working_file, dtype = np.dtype('>d')) 
+            self.ext_data = np.fromfile(working_file, dtype = np.dtype('>d')) 
             
-            # Close the opened data
-            working_file.close()
-
-        # Calculating applied voltage from bin file data (based on the first 200 datapoints)
-        self.appl_voltage = math.ceil(sum(raw_data[5:205:2]) / len(raw_data[5:205:2]))
+        # Close the opened data
+        working_file.close()
         
+    
+    def dataToUse(self):
+        """ dataToUse makes another array to use onthe the data that the user wants to extract """
         # Checks if a number or text file is set for the end time to know how much data to analyze.
         if (type(self.end_t) is int) == True or (type(self.end_t) is float) == True:
             end_time = self.end_t 
         elif (type(self.end_t) is str) == True:
-            end_time = math.floor(len(raw_data[0::2]) / self.acq_rate)
+            end_time = math.floor(len(self.ext_data[0::2]) / self.acq_rate)
             
         actual_start = math.floor(self.star_t * self.acq_rate) # formats start time to acquisition rate
         actual_end = math.floor(end_time * self.acq_rate) #  # formats end time to acquisition rate
     
-        working_baseline, raw_data = raw_data[0::2][actual_start:actual_end:], []
+        self.working_baseline, self.ext_data = self.ext_data[0::2][actual_start:actual_end:], []
         
-        # Converting current to delta G
-        delta_g_values, working_baseline = np.divide(working_baseline, self.appl_voltage), []
+    
+    def appliedVoltage(self):
+        """ appliedVoltage calculates what the applied volatge during the experiment was by looking
+        at the extracted voltage data from the bin file. This only works for a datasets that had a
+        constant voltage applied throught the experiment. """
+        # Calculating applied voltage from bin file data (based on the first 200 datapoints)
+        self.appl_voltage = math.ceil(sum(self.ext_data[5:205:2]) / len(self.ext_data[5:205:2]))
+        
+        
+    def standardizeOutput(self, dataset):
+        """ StandardizeOutput takes a 1D array of data and standardizes it by converting Mean == 0, but
+        it does not effect that standard deviation"""
+        return (preprocessing.scale(dataset, with_std = False))
+        
+        
+        
+    def plotHistogram(self, xmin = None, xmax = None):
+        """ Function that plots a Kernel Density Estimator plot for the extracted data at a specific
+        time scale specified in the when initializing the class. """
+        # Extracts all data from bin file
+        self.extractBinData()
+        
+        # Calculates the applied voltage form bin file data (based on first 200 datapoints).
+        self.appliedVoltage()
+        
+        # Uses dataToUse function to truncate total dataset
+        self.dataToUse()
+        
+        # Converting datasets measured current to delta G
+        delta_g_values = np.divide(self.working_baseline, self.appl_voltage)
         
         # Plotting for standardized data
         if self.standardize == True:
             # Standardizing dataset
-            scaled_data, delta_g_values = preprocessing.scale(delta_g_values, with_std = False), []
+            scaled_data, delta_g_values = self.standardizeOutput(delta_g_values), []
             print(f"Starting to Plot Data: {time.time() - run_time}")
             fig, ax = plt.subplots(figsize = (9,8))
             
@@ -132,8 +166,7 @@ class DeltaGHistogram():
             ax.set(xlabel = "Standardized Conductance")
             
             # Setting limmits for x axis
-            if self.set_xlim == True:
-                ax.set_xlim(min(self.xlim_val), max(self.xlim_val))
+            ax.set_xlim(xmin, xmax)
         
         # Plotting for un-standardized data
         elif self.standardize == False:
@@ -144,8 +177,7 @@ class DeltaGHistogram():
             ax.set(xlabel = "Standardized Conductance")
             
             # Setting limmits for x axis
-            if self.set_xlim == True:
-                ax.set_xlim(min(self.xlim_val), max(self.xlim_val))
+            ax.set_xlim(xmin, xmax)
         
         # Saving the file section
         if (type(self.end_t) is str) == True:
@@ -166,14 +198,42 @@ class DeltaGHistogram():
         # Show and close the plots
         plt.show()
         plt.close()
+        
+        
+    def derivativePlot(self, xmin = None, xmax = None):
+        """ derivativePlot takes the derivative of the data and plots it. """
+        # Extracts all data from bin file
+        self.extractBinData()
+        
+        # Uses dataToUse function to truncate total dataset
+        self.dataToUse()
+        
+        # Create list to show spacing for each datapoint
+        # time_spacing = np.linspace(start = 0, stop = len(self.working_baseline) / self.acq_rate, num = len(self.working_baseline))
+        
+        # Taking the derivative of the data provided
+        der_data = np.gradient(self.working_baseline) # , (1 / self.acq_rate))
+        # stand_der_data = self.standardizeOutput(der_data)
+        fig, ax = plt.subplots(figsize = (9,8))
+        
+        plt.hist(der_data, bins = 100)
+        ax.set_xlim(xmin, xmax)
+        plt.show()
+        plt.close()
+        
 
+    def plotBaseline():
+        pass
 
 #%%
 
 """ ----- Calling Class and function to plot data ----- """
 
-initialize_data = DeltaGHistogram(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path, make_folder = folder_to_add[0], standardize = standardize_data, set_xlim = set_x_axis, xlim_val = xlim_values)
-current_data = DeltaGHistogram.plotHistogram(initialize_data)
+initialize_data = PlotAnalyzeBaseline(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path, make_folder = folder_to_add[0], standardize = standardize_data, set_xlim = set_x_axis) # , xlim_val = xlim_values)
+#%%
+current_data = initialize_data.plotHistogram(xmin = -5, xmax = 5)
+#%%
+deriv_data = initialize_data.derivativePlot(-100, 100)
 
 #%%
 
