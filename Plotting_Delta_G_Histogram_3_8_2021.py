@@ -14,10 +14,10 @@ Notes:
 """ ----- Variables to Change ----- """
 
 # Name of files to analyze
-files = "JH_L01_2_15_2021_pH7_1MKCl_Azo_2_UV365nm_1_p200mV_10uL_05_uguL_3kbpDNA_GS_1212"
+files = "JH_L01_11_9_2020_pH7_1MKCl_Azo_1_UV365nm3_m200mV_blank_1538"
 
 # Path to the Directory where the data is stored.
-path = "D:\\Research\\Data\\Azo_Switch_Data\\February17_2021\\Azo"
+path = "D:\\Research\\Data\\Azo_Switch_Data\\November12_2020\\Azo\\1"
 # February17_2021\\Azo
 
 # Data Colelction Frequency
@@ -25,10 +25,7 @@ acquisition_rate = 100000
 
 # Times stamp for data to run
 start_time = 1
-end_time = 2 # Inputting a string will plot the whole dataset
-
-
-
+end_time = 300 # Inputting a string will plot the whole dataset
 
 #%%
 
@@ -45,13 +42,12 @@ import seaborn as sns
 
 # Setting styles for seaborn plots
 # sns.set_style(style = "darkgrid")
-sns.set(font_scale = 2, font = "Arial")
+# sns.set(font_scale = 2, font = "Arial")
 
 # Setting timer for script
 run_time = time.time()
 
-# Setting folder name to be generated
-folder_to_add = ["Conductance_KDE_Plots", "Event_Plots"]
+
 
 #%%
 
@@ -60,6 +56,9 @@ folder_to_add = ["Conductance_KDE_Plots", "Event_Plots"]
 class PlotAnalyzeBaseline():
     """ This class will be used to extract data from bin files and create different plots to 
     display and analyze the data collected. """
+    
+    # Setting folder name to be generated
+    folder_to_add = ["Dataset_Plots", "Conductance_KDE_Plots", "Event_Plots", "Histogram_Plots"]
     
     def __init__(self, data_file, acq_rate, file_path, start_t = 1, end_t = "Whole_Run"): # , xlim_val = [-4, 4]):
         """ data_file - Name of file to be opened
@@ -81,6 +80,12 @@ class PlotAnalyzeBaseline():
         self.ext_data = []
         self.working_baseline = []
         
+        # Makes the master folder to hold all plots
+        try:
+            os.mkdir(os.path.join(self.file_path, self.folder_to_add[0]))
+        except:
+            pass
+        
         
     def extractBinData(self):
         """ This function is called to extract data from a bin file. For the data from the dwyer
@@ -89,8 +94,6 @@ class PlotAnalyzeBaseline():
         # Opening the data from bin files
         with open(os.path.join(self.file_path, f"{self.data_file}.bin")) as working_file: # assign working path to location of .bin files
 
-            
-                
             # Extracting data as a double for most accuracy in final values
             self.ext_data = np.fromfile(working_file, dtype = np.dtype('>d')) 
             
@@ -125,7 +128,36 @@ class PlotAnalyzeBaseline():
         it does not effect that standard deviation
                 dataset - 1D array that will be standardized. """
         return (preprocessing.scale(dataset, with_std = False))
+    
+    
+    def positiveCurrent(self, dataset):
+        """ positiveCurrent converts all negative currents to positive 
+        currents for normalization data to histogram it... """
+        # self.working_baseline
+        return ([abs(current_values) for current_values in dataset])
+    
+    
+    def maxZero(self, dataset):
+        """ minZero converts maximum current value to zero and calculates the distance 
+        between this value and the other values in a dataset (for visualization of 
+        current shifting)"""
+        max_cond = max(dataset)
+        positive_dataset = self.positiveCurrent(dataset)
+        reverse_dataset = []
         
+        # for index, values in enumerate(dataset):
+        #     reverse_dataset.append(abs(max_cond - values))
+        
+        reverse_dataset.append([abs(max_cond - values) for values in positive_dataset])
+        
+        return (reverse_dataset)
+            
+    
+    
+    def toConductance(self):
+        """ toConductance converts the current to conductance values based on the applied voltage and 
+        measured current values. """
+        return (np.divide(self.working_baseline, self.appl_voltage))
         
         
     def plotHistogram(self, xmin = None, xmax = None):
@@ -143,7 +175,8 @@ class PlotAnalyzeBaseline():
         self.dataToUse()
         
         # Converting datasets measured current to delta G
-        delta_g_values = np.divide(self.working_baseline, self.appl_voltage)
+        delta_g_values = self.toConductance()
+        # delta_g_values = np.divide(self.working_baseline, self.appl_voltage)
         
         # Plotting for standardized data
         scaled_data, delta_g_values = self.standardizeOutput(delta_g_values), []
@@ -178,11 +211,11 @@ class PlotAnalyzeBaseline():
             
         # Generating a folder where plots will be saved
         try:
-            os.mkdir(os.path.join(self.file_path, "Conductance_KDE_Plots"))
+            os.mkdir(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[1]))
         except OSError as error:
             print(error)
         
-        plt.savefig(os.path.join(self.file_path, "Conductance_KDE_Plots") + "\\" + file_Name + ".png", dpi = 600)
+        plt.savefig(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[1]) + "\\" + file_Name + ".png", dpi = 600)
         
         # Show and close the plots
         plt.show()
@@ -232,11 +265,12 @@ class PlotAnalyzeBaseline():
             end_time = math.floor(len(self.ext_data[0::2]) / self.acq_rate)
             
         # Calculates the time values for x axis based on acquisition rate and number of datapoints
-        current_Trace_Time = np.arange((self.start_t - self.start_t),((math.floor(end_time * self.acq_rate) - math.floor(self.start_t * self.acq_rate)) / self.acq_rate), (1/self.acq_rate))
-        
+        current_trace_time = np.arange((self.start_t - self.start_t),((math.floor(end_time * self.acq_rate) - (self.start_t * self.acq_rate)) / self.acq_rate), (1/self.acq_rate))
+        # current_Trace_Time = np.arange((start_time - start_time),((actual_end - actual_start) / frequency),(1/frequency)) # creates list the size of the dataset to plot the current values against
+    
         fig, ax = plt.subplots(figsize = (25,7))  
     
-        plt.plot(current_Trace_Time, self.working_baseline, linewidth = 2, color = 'black')
+        plt.plot(current_trace_time, self.working_baseline, linewidth = 2, color = 'black')
         plt.locator_params(nbins = 7)
         
         ax.set_xlabel("Time (s)", size = 25, fontname = "Arial") #    Time (s)
@@ -259,26 +293,86 @@ class PlotAnalyzeBaseline():
         
         fig.tight_layout() # help keep axis titles on the figure
         
-        plt.savefig(os.path.join(self.file_path, "Event_Plots") + "\\" + self.data_file[0] + "_" + str(self.start_t) + "_" + str(self.end_t) + ".png", dpi = 1200)
+        try:
+            os.mkdir(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[2]))
+        except:
+            pass
+        
+        plt.savefig(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[2]) + "\\" + self.data_file[0] + "_" + str(self.start_t) + "_" + str(self.end_t) + ".png", dpi = 1200)
         
         # Displays figure and closes the figure to save memory space
         plt.show()
         plt.close()
+        
+
+    def normalizedHistogram(self, xmin = None, xmax = None, bins = 75):
+        """ normalizedHistogram produces a histogram that converts current 
+        to positive values, sets max ot zero and histograms out from that. """
+        # Extracts all data from bin file
+        self.extractBinData()
+        
+        # Calculates the applied voltage form bin file data (based on first 200 datapoints).
+        self.appliedVoltage()
+        
+        # Uses dataToUse function to truncate total dataset
+        self.dataToUse()
+        
+        # Converting datasets measured current to delta G
+        delta_g_values = self.toConductance()
+        
+        normalized_data = self.maxZero(delta_g_values)
+        
+        fig, ax = plt.subplots(figsize = (9,8))
+        
+        plt.hist(normalized_data, bins = bins)
+        ax.set_xlabel("Normalized Conductance", size = 25, fontname = "Arial") #    Time (s)
+        ax.set_ylabel("Counts", size = 25, fontname = "Arial")
+        ax.set_xlim(xmin, xmax)
+        
+        # Sets parameters for axis labels
+        plt.xticks(fontsize = 22, fontname = 'Arial')
+        plt.yticks(fontsize = 22, fontname = 'Arial')
+        
+        # Sets parametesr for plot formatting
+        ax.spines['top'].set_visible(False) # Removes top and right lines of plot
+        ax.spines['right'].set_visible(False)
+        
+        ax.spines['left'].set_linewidth(3) # Makes the boarder bold
+        ax.xaxis.set_tick_params(width = 3)
+        ax.spines['bottom'].set_linewidth(3) # Makes the boarder bold
+        ax.yaxis.set_tick_params(width = 3)
+        
+        # Making folder and saving plot
+        try:
+            os.mkdir(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[3]))
+        except:
+            pass
+        file_Name = "{}_{}_{}_{}" .format(self.data_file, self.start_t, self.end_t, "Norm_Hist_G")
+        
+        plt.savefig(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[3]) + "\\" + file_Name + ".png", dpi = 600)
+        
+        # showing plot and removing it from memory
+        plt.show()
+        plt.close()        
+        
 
 #%%
 
 """ ----- Calling Class and function to plot data ----- """
 
 initialize_data = PlotAnalyzeBaseline(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path) # , xlim_val = xlim_values)
-#%%
-current_data = initialize_data.plotHistogram(xmin = -5, xmax = 5)
-#%%
-deriv_data = initialize_data.derivativePlot(-100, 100)
-#%%
 
-initialize_data.plotBaseline()
+#%% 
 
-#%%
+norm_data_plot = initialize_data.normalizedHistogram(xmin = -1, xmax = 15, bins = 50)
+
+# current_data = initialize_data.plotHistogram(xmin = -5, xmax = 5)
+
+# deriv_data = initialize_data.derivativePlot(-100, 100)
+
+# initialize_data.plotBaseline()
+
+#%% 
 
 """ ----- Timing Section ----- """
 
