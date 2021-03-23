@@ -4,7 +4,6 @@
 
 Notes:
     Plot Kernel Density Estimation (KDE) Figures.
-    
     This script takes ~30 minutes for a nanopore experiment collected over
     20 minutes at 100 kHz acquisition rate.
 """
@@ -14,10 +13,10 @@ Notes:
 """ ----- Variables to Change ----- """
 
 # Name of files to analyze
-files = "JH_L01_11_9_2020_pH7_1MKCl_Azo_1_UV365nm3_m200mV_blank_1538"
+files = "JH_L01_11_9_2020_pH7_1MKCl_Azo_1_UV365nm_m200mV_10uL_2mgmL_GS_1223"
 
 # Path to the Directory where the data is stored.
-path = "D:\\Research\\Data\\Azo_Switch_Data\\November12_2020\\Azo\\1"
+path = "D:\\Research\\Data\\Azo_Switch_Data\\November11_2020\\Azo\\1"
 # February17_2021\\Azo
 
 # Data Colelction Frequency
@@ -25,7 +24,7 @@ acquisition_rate = 100000
 
 # Times stamp for data to run
 start_time = 1
-end_time = 300 # Inputting a string will plot the whole dataset
+end_time = 81 # Inputting a string will plot the whole dataset
 
 #%%
 
@@ -39,7 +38,7 @@ import math
 import time
 from sklearn import preprocessing
 import seaborn as sns
-
+from statistics import stdev as std
 # Setting styles for seaborn plots
 # sns.set_style(style = "darkgrid")
 # sns.set(font_scale = 2, font = "Arial")
@@ -355,6 +354,168 @@ class PlotAnalyzeBaseline():
         plt.show()
         plt.close()        
         
+        
+    def baselineHistogram(self, xmin = None, xmax = None, bins = 75, color = None):
+        """ ----- Histograms baseline with un-normalized conductance values. ----- """
+        # Extracts all data from bin file
+        self.extractBinData()
+        
+        # Calculates the applied voltage form bin file data (based on first 200 datapoints).
+        self.appliedVoltage()
+        
+        # Uses dataToUse function to truncate total dataset
+        self.dataToUse()
+        
+        # Converting datasets measured current to delta G
+        delta_g_values = self.toConductance()
+        
+        # Plot a histogram of the normalized data
+        fig, ax = plt.subplots(figsize = (9,8))
+        
+        plt.hist(delta_g_values, bins = bins, color = color)
+        
+        ax.set_xlabel("Conductance", size = 25, fontname = "Arial")
+        ax.set_ylabel("Counts", size = 25, fontname = "Arial")
+        ax.set_xlim(xmin, xmax)
+        
+        # Sets parameters for axis labels
+        plt.xticks(fontsize = 22, fontname = 'Arial')
+        plt.yticks(fontsize = 22, fontname = 'Arial')
+        
+        # Sets parametesr for plot formatting
+        ax.spines['top'].set_visible(False) # Removes top and right lines of plot
+        ax.spines['right'].set_visible(False)
+        
+        ax.spines['left'].set_linewidth(3) # Makes the boarder bold
+        ax.xaxis.set_tick_params(width = 3)
+        ax.spines['bottom'].set_linewidth(3) # Makes the boarder bold
+        ax.yaxis.set_tick_params(width = 3)
+        
+        # Making folder and saving plot
+        try:
+            os.mkdir(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[3]))
+        except:
+            pass
+        
+        file_Name = "{}_{}_{}_{}" .format(self.data_file, self.start_t, self.end_t, "Baseline_G")
+        
+        plt.savefig(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[3]) + "\\" + file_Name + ".png", dpi = 600)
+        
+        # showing plot and removing it from memory
+        plt.show()
+        plt.close() 
+        
+        
+    def histogramVariableBaseline(self, xmin = None, xmax = None, bins = 75):
+        """ ----- Follows the baseline and sets the maxinum current values
+        to normalize all values in conductance. ----- """
+        # Extracts all data from bin file
+        self.extractBinData()
+        
+        # Calculates the applied voltage form bin file data (based on first 200 datapoints).
+        self.appliedVoltage()
+        
+        # Uses dataToUse function to truncate total dataset
+        self.dataToUse()
+        
+        # delta_g_values = self.positiveCurrent(self.working_baseline)
+        # Converting datasets measured current to delta G
+        delta_g_values = self.toConductance()
+        
+        baseline_histogram_data = []
+        
+        # Number of datapoints in a window for histogramming
+        window_size = 20000
+        
+        # On off switch for collecting baseline
+        on_off_baseline = 0
+        excess = 0
+        
+        for window_values in list(range(math.ceil(len(delta_g_values) / window_size))):
+            try:
+                window_dataset = delta_g_values[window_values * window_size : (window_values + 1) * window_size :]
+                print(window_values)
+            except:
+                window_dataset = delta_g_values[window_values * window_size : len(delta_g_values) :]
+                print(window_values)
+                print("End")
+                
+            bin_width = (3.49 * std(window_dataset))/(len(window_dataset)**(1/3))
+            number_of_bins = int((max(window_dataset) - min(window_dataset)) / bin_width)
+            
+            # np.histogram creates a 2d array: [{counts}, {conductance}] 
+            histogram_of_window = np.histogram(window_dataset, bins = number_of_bins)
+            
+            # Finds the index of the maximum bin
+            max_bin_value = np.argmax(histogram_of_window[0])
+            
+            # Finds the most populated conductance value in histogram
+            popular_conductance_value = ((histogram_of_window[1][max_bin_value] + histogram_of_window[1][max_bin_value + 1]) / 2)
+            
+            # Determines the value associated with the most populated bin
+            normalized_values = ([(norm_values / popular_conductance_value) for norm_values in window_dataset])
+            
+            for values in normalized_values:
+                if values >= 0.99 and values <= 1.01:
+                    if on_off_baseline == 200:
+                        baseline_histogram_data.append(values)
+                        on_off_baseline = 0
+                    if on_off_baseline < 200:
+                        on_off_baseline += 1
+                
+                elif values > 1.01:
+                    if excess < 1000:
+                        excess += 1
+                    if excess == 1000:
+                        baseline_histogram_data.append(values)
+                        excess = 0
+                elif values < 0.99:
+                    baseline_histogram_data.append(values)
+
+        # Plot a histogram of the normalized data
+        fig, ax = plt.subplots(figsize = (9,8))
+        
+        plt.hist(baseline_histogram_data, bins = bins)
+        """
+        ax1 = fig.add_subplot(111)
+        ax1.hist(baseline_histogram_data, bins = bins)
+        
+        ax2 = ax1.twinx()
+        ax2.hist(event_histogram_data, bins = bins)
+        """
+        ax.set_xlabel("Normalized Conductance Difference", size = 25, fontname = "Arial")
+        ax.set_ylabel("Counts", size = 25, fontname = "Arial")
+        ax.set_xlim(xmin, xmax)
+        
+        # Sets parameters for axis labels
+        plt.xticks(fontsize = 22, fontname = 'Arial')
+        plt.yticks(fontsize = 22, fontname = 'Arial')
+        plt.yscale('log')
+        
+        # Sets parametesr for plot formatting
+        ax.spines['top'].set_visible(False) # Removes top and right lines of plot
+        ax.spines['right'].set_visible(False)
+        
+        ax.spines['left'].set_linewidth(3) # Makes the boarder bold
+        ax.xaxis.set_tick_params(width = 3)
+        ax.spines['bottom'].set_linewidth(3) # Makes the boarder bold
+        ax.yaxis.set_tick_params(width = 3)
+        
+        # Making folder and saving plot
+        try:
+            os.mkdir(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[3]))
+        except:
+            pass
+        file_Name = "{}_{}_{}_{}" .format(self.data_file, self.start_t, self.end_t, "Follow_baseline_Hist")
+        
+        plt.savefig(os.path.join(self.file_path, self.folder_to_add[0], self.folder_to_add[3]) + "\\" + file_Name + ".png", dpi = 600)
+        
+        # showing plot and removing it from memory
+        plt.show()
+        plt.close() 
+        
+        baseline_histogram_data, histogram_of_window, window_dataset = [], [], []
+        
 
 #%%
 
@@ -362,9 +523,15 @@ class PlotAnalyzeBaseline():
 
 initialize_data = PlotAnalyzeBaseline(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path) # , xlim_val = xlim_values)
 
+#%%
+
+bin_values_final = initialize_data.histogramVariableBaseline(xmin = 0.9, xmax = 1.02, bins = 40)
+
+# initialize_data.baselineHistogram(xmin = 74, xmax = 84, bins = 31, color = "purple")
+ 
 #%% 
 
-norm_data_plot = initialize_data.normalizedHistogram(xmin = -1, xmax = 15, bins = 50)
+# norm_data_plot = initialize_data.normalizedHistogram(xmin = -1, xmax = 15, bins = 50)
 
 # current_data = initialize_data.plotHistogram(xmin = -5, xmax = 5)
 
