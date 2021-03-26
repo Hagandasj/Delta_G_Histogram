@@ -1,7 +1,7 @@
 # Description
 
-This python script will convert current values from bin files to conductance data and create a Kernel Density Estimator plot of these values.
+This python script will open and work with current and voltage values extracted from a bin file (generated from an Azopatch 200B). This script can plot the current data (in time) and histogram these values.
 
 ## Notes on Code
 
-This file is outputting KDE plots. However, it takes about 30 minutes to generate these plots for a ~20 minute run at 100 kHz. I am hoping to have this optimized by this by Friday (3/8/2021).
+This file is outputting KDE plots, histogram plots, and scatter plots of the current data. This file is still being updated to be able to work the data in other ways.
