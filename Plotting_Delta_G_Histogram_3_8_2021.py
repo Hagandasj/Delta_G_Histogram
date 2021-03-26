@@ -16,15 +16,16 @@ Notes:
 files = "JH_L01_2_15_2021_pH7_1MKCl_Azo_2_UV365nm_1_p200mV_10uL_05_uguL_3kbpDNA_GS_1230"
 
 # Path to the Directory where the data is stored.
-path = "D:\\Research\\Data\\Azo_Switch_Data\\February17_2021\\Azo"
+path = "F:\\Research\\Data\\Azo_Switch_Data\\February17_2021\\Azo"
 # February17_2021\\Azo
 
 # Data Colelction Frequency
 acquisition_rate = 100000
 
 # Times stamp for data to run
-start_time = 620
-end_time = 680 # Inputting a string will plot the whole dataset
+start_time = 1
+end_time = "Whole_Run" # Inputting a string will plot the whole dataset
+# 620, 680
 
 #%%
 
@@ -406,7 +407,7 @@ class PlotAnalyzeBaseline():
         plt.close() 
         
         
-    def histogramVariableBaseline(self, xmin = None, xmax = None, bins = 75):
+    def histogramVariableBaseline(self, xmin = None, xmax = None, bins = 75, color = None):
         """ ----- Follows the baseline and sets the maxinum current values
         to normalize all values in conductance. ----- """
         # Extracts all data from bin file
@@ -427,8 +428,7 @@ class PlotAnalyzeBaseline():
         # Number of datapoints in a window for histogramming
         window_size = 20000
         
-        # On off switch for collecting baseline
-        on_off_baseline = 0
+        # On off switch for excess
         excess = 0
         
         for window_values in list(range(math.ceil(len(delta_g_values) / window_size))):
@@ -437,8 +437,7 @@ class PlotAnalyzeBaseline():
                 print(window_values)
             except:
                 window_dataset = delta_g_values[window_values * window_size : len(delta_g_values) :]
-                print(window_values)
-                print("End")
+                print(f"{window_values}, The End...")
                 
             bin_width = (3.49 * std(window_dataset))/(len(window_dataset)**(1/3))
             number_of_bins = int((max(window_dataset) - min(window_dataset)) / bin_width)
@@ -454,40 +453,43 @@ class PlotAnalyzeBaseline():
             
             # Determines the value associated with the most populated bin
             normalized_values = ([(norm_values / popular_conductance_value) for norm_values in window_dataset])
-            
-            # Reduces the number of baseline values used in the histogram
+            sumup = 0
             for values in normalized_values:
-                if values >= 0.995 and values <= 1.005:
-                    if on_off_baseline == 1:
-                        baseline_histogram_data.append(values)
-                        on_off_baseline = 0
-                    if on_off_baseline < 1:
-                        on_off_baseline += 1
-                
-                elif values > 1.005: #  and values < 1.02:
-                    if excess < 5:
+                sumup += values
+            
+            mean = sumup / len(normalized_values)
+            
+            if mean > 0.999:
+                continue
+            
+            for values in normalized_values:
+                if values > 1.02:
+                    if excess < 75:
                         excess += 1
-                    if excess == 5:
+                        pass
+                    else:
                         baseline_histogram_data.append(values)
                         excess = 0
-                
-                # elif values >= 1.02:
-                #     pass
-
-                elif values < 0.995:
+                else:
                     baseline_histogram_data.append(values)
-
+                    
+            
+            # baseline_histogram_data.extend(normalized_values)
+        
         # Plot a histogram of the normalized data
-        fig, ax = plt.subplots(figsize = (9,8))
-        
-        plt.hist(baseline_histogram_data, bins = bins, color = "purple", histtype = 'stepfilled', log = True)
+        fig, ax = plt.subplots(figsize = (9,9))
         """
-        ax1 = fig.add_subplot(111)
-        ax1.hist(baseline_histogram_data, bins = bins)
+        starting_weights = np.ones_like(baseline_histogram_data)
+        weights = []
+        for index, weight_values in enumerate(starting_weights):
+            if index == len(starting_weights) - 10000:
+                weights.append(0.001)
+            else:
+                weights.append(weight_values)
+        """      
         
-        ax2 = ax1.twinx()
-        ax2.hist(event_histogram_data, bins = bins)
-        """
+        plt.hist(baseline_histogram_data, bins = bins, color = color, histtype = 'stepfilled', log = True) # , weights = weights)
+        
         ax.set_xlabel("Normalized Conductance Difference", size = 30, fontname = "Arial")
         ax.set_ylabel("Counts", size = 30, fontname = "Arial")
         ax.set_xlim(xmin, xmax)
@@ -500,10 +502,10 @@ class PlotAnalyzeBaseline():
         ax.spines['top'].set_visible(False) # Removes top and right lines of plot
         ax.spines['right'].set_visible(False)
         
-        ax.spines['left'].set_linewidth(3) # Makes the boarder bold
-        ax.xaxis.set_tick_params(width = 3)
-        ax.spines['bottom'].set_linewidth(3) # Makes the boarder bold
-        ax.yaxis.set_tick_params(width = 3)
+        ax.spines['left'].set_linewidth(5) # Makes the boarder bold
+        ax.xaxis.set_tick_params(width = 5)
+        ax.spines['bottom'].set_linewidth(5) # Makes the boarder bold
+        ax.yaxis.set_tick_params(width = 5)
         
         # Making folder and saving plot
         try:
@@ -530,7 +532,7 @@ initialize_data = PlotAnalyzeBaseline(data_file = files, acq_rate = acquisition_
 
 #%%
 
-bin_values_final = initialize_data.histogramVariableBaseline(xmin = 0.9, xmax = 1.05, bins = 200)
+bin_values_final = initialize_data.histogramVariableBaseline(xmin = 0.9, xmax = 1.04, bins = 100, color = "tab:blue")
 
 # initialize_data.baselineHistogram(xmin = 74, xmax = 84, bins = 33, color = "purple") # 
  
@@ -549,3 +551,12 @@ bin_values_final = initialize_data.histogramVariableBaseline(xmin = 0.9, xmax = 
 """ ----- Timing Section ----- """
 
 print("This script took {:.5f} seconds to run" .format(time.time() - run_time))
+
+
+"""
+ax1 = fig.add_subplot(111)
+ax1.hist(baseline_histogram_data, bins = bins)
+        
+ax2 = ax1.twinx()
+ax2.hist(event_histogram_data, bins = bins)
+"""
