@@ -13,18 +13,18 @@ Notes:
 """ ----- Variables to Change ----- """
 
 # Name of files to analyze
-files = "JH_L01_11_9_2020_pH7_1MKCl_Azo_1_UV365nm_m200mV_10uL_2mgmL_GS_1223"
+files = "JH_L01_2_15_2021_pH7_1MKCl_Azo_2_UV365nm_1_p200mV_10uL_05_uguL_3kbpDNA_GS_1230"
 
 # Path to the Directory where the data is stored.
-path = "D:\\Research\\Data\\Azo_Switch_Data\\November11_2020\\Azo\\1"
+path = "D:\\Research\\Data\\Azo_Switch_Data\\February17_2021\\Azo"
 # February17_2021\\Azo
 
 # Data Colelction Frequency
 acquisition_rate = 100000
 
 # Times stamp for data to run
-start_time = 1
-end_time = 81 # Inputting a string will plot the whole dataset
+start_time = 620
+end_time = 680 # Inputting a string will plot the whole dataset
 
 #%%
 
@@ -372,24 +372,24 @@ class PlotAnalyzeBaseline():
         # Plot a histogram of the normalized data
         fig, ax = plt.subplots(figsize = (9,8))
         
-        plt.hist(delta_g_values, bins = bins, color = color)
+        plt.hist(delta_g_values, bins = bins, color = color, histtype = 'stepfilled', density = True)
         
-        ax.set_xlabel("Conductance", size = 25, fontname = "Arial")
-        ax.set_ylabel("Counts", size = 25, fontname = "Arial")
+        ax.set_xlabel("Conductance", size = 30, fontname = "Arial")
+        ax.set_ylabel("Normalized Counts", size = 30, fontname = "Arial")
         ax.set_xlim(xmin, xmax)
         
         # Sets parameters for axis labels
-        plt.xticks(fontsize = 22, fontname = 'Arial')
-        plt.yticks(fontsize = 22, fontname = 'Arial')
+        plt.xticks(fontsize = 30, fontname = 'Arial')
+        plt.yticks([]) # fontsize = 30, fontname = 'Arial')
         
         # Sets parametesr for plot formatting
         ax.spines['top'].set_visible(False) # Removes top and right lines of plot
         ax.spines['right'].set_visible(False)
         
-        ax.spines['left'].set_linewidth(3) # Makes the boarder bold
-        ax.xaxis.set_tick_params(width = 3)
-        ax.spines['bottom'].set_linewidth(3) # Makes the boarder bold
-        ax.yaxis.set_tick_params(width = 3)
+        ax.spines['left'].set_linewidth(4) # Makes the boarder bold
+        ax.xaxis.set_tick_params(width = 4)
+        ax.spines['bottom'].set_linewidth(4) # Makes the boarder bold
+        ax.yaxis.set_tick_params(width = 4)
         
         # Making folder and saving plot
         try:
@@ -455,27 +455,32 @@ class PlotAnalyzeBaseline():
             # Determines the value associated with the most populated bin
             normalized_values = ([(norm_values / popular_conductance_value) for norm_values in window_dataset])
             
+            # Reduces the number of baseline values used in the histogram
             for values in normalized_values:
-                if values >= 0.99 and values <= 1.01:
-                    if on_off_baseline == 200:
+                if values >= 0.995 and values <= 1.005:
+                    if on_off_baseline == 1:
                         baseline_histogram_data.append(values)
                         on_off_baseline = 0
-                    if on_off_baseline < 200:
+                    if on_off_baseline < 1:
                         on_off_baseline += 1
                 
-                elif values > 1.01:
-                    if excess < 1000:
+                elif values > 1.005: #  and values < 1.02:
+                    if excess < 5:
                         excess += 1
-                    if excess == 1000:
+                    if excess == 5:
                         baseline_histogram_data.append(values)
                         excess = 0
-                elif values < 0.99:
+                
+                # elif values >= 1.02:
+                #     pass
+
+                elif values < 0.995:
                     baseline_histogram_data.append(values)
 
         # Plot a histogram of the normalized data
         fig, ax = plt.subplots(figsize = (9,8))
         
-        plt.hist(baseline_histogram_data, bins = bins)
+        plt.hist(baseline_histogram_data, bins = bins, color = "purple", histtype = 'stepfilled', log = True)
         """
         ax1 = fig.add_subplot(111)
         ax1.hist(baseline_histogram_data, bins = bins)
@@ -483,14 +488,13 @@ class PlotAnalyzeBaseline():
         ax2 = ax1.twinx()
         ax2.hist(event_histogram_data, bins = bins)
         """
-        ax.set_xlabel("Normalized Conductance Difference", size = 25, fontname = "Arial")
-        ax.set_ylabel("Counts", size = 25, fontname = "Arial")
+        ax.set_xlabel("Normalized Conductance Difference", size = 30, fontname = "Arial")
+        ax.set_ylabel("Counts", size = 30, fontname = "Arial")
         ax.set_xlim(xmin, xmax)
         
         # Sets parameters for axis labels
-        plt.xticks(fontsize = 22, fontname = 'Arial')
-        plt.yticks(fontsize = 22, fontname = 'Arial')
-        plt.yscale('log')
+        plt.xticks(fontsize = 30, fontname = 'Arial')
+        plt.yticks(fontsize = 30, fontname = 'Arial')
         
         # Sets parametesr for plot formatting
         ax.spines['top'].set_visible(False) # Removes top and right lines of plot
@@ -523,11 +527,12 @@ class PlotAnalyzeBaseline():
 
 initialize_data = PlotAnalyzeBaseline(data_file = files, acq_rate = acquisition_rate, start_t = start_time, end_t = end_time, file_path = path) # , xlim_val = xlim_values)
 
+
 #%%
 
-bin_values_final = initialize_data.histogramVariableBaseline(xmin = 0.9, xmax = 1.02, bins = 40)
+bin_values_final = initialize_data.histogramVariableBaseline(xmin = 0.9, xmax = 1.05, bins = 200)
 
-# initialize_data.baselineHistogram(xmin = 74, xmax = 84, bins = 31, color = "purple")
+# initialize_data.baselineHistogram(xmin = 74, xmax = 84, bins = 33, color = "purple") # 
  
 #%% 
 
